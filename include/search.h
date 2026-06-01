@@ -18,6 +18,7 @@
 // Principal variation search
 // Late move reductions
 // Check extensions
+// Reverse futility pruning
 // Null move pruning
 // Killer moves
 // History heuristics

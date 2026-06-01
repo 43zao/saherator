@@ -560,7 +560,7 @@ It is built around a **Negamax alpha-beta framework**, extended with multiple mo
 
 * transposition table acceleration
 * aggressive move ordering
-* pruning (null move, LMR)
+* pruning (null move, LMR...)
 * quiescence stabilization
 * iterative deepening with aspiration windows
 
@@ -590,6 +590,7 @@ Features:
 * transposition table cuts
 * mate distance pruning
 * null move pruning
+* reverse futility pruning
 * check extensions
 * late move reductions (LMR)
 * principal variation search (PVS-style re-search)
@@ -646,6 +647,14 @@ Priority:
 Killer moves are stored per ply.
 
 History heuristic rewards quiet moves that cause beta cutoffs.
+
+### Reverse Futility Pruning
+
+Applied in quiet, non-check positions at shallow search depths.
+
+If the evaluation already exceeds beta by a depth-dependent margin, the search immediately returns a beta cutoff.
+
+Used to avoid spending time on positions that are already evaluated as significantly better than the opponent can tolerate.
 
 ### Null Move Pruning
 
@@ -753,10 +762,8 @@ Two killer moves are stored per ply:
 
 ### Future Improvements
 
-Current search still lacks:
-
 * singular extensions
-* advanced pruning (razoring / futility pruning)
+* razoring
 * improved SEE-based pruning
 * opening books
 * endgame tablebase support

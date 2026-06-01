@@ -111,8 +111,7 @@ namespace Search
         {
             if (board.undo_stack[i].zobrist == board.zobrist)
             {
-                if (++count >= 3)
-                    return true;
+                if (++count >= 3) return true;
             }
         }
 
@@ -141,14 +140,9 @@ namespace Search
     // MOVE ORDERING
     //--------------------------------------------------
 
-    static inline int score_move(
-        Move move,
-        Move ttMove,
-        Move killer1,
-        Move killer2)
+    static inline int score_move(Move move, Move ttMove, Move killer1, Move killer2)
     {
-        if (move == ttMove)
-            return 1000000;
+        if (move == ttMove) return 1000000;
 
         int from = move_from(move);
         int to   = move_to(move);
@@ -163,11 +157,9 @@ namespace Search
 
         // killer moves
 
-        if (move == killer1)
-            return 800000;
+        if (move == killer1) return 800000;
 
-        if (move == killer2)
-            return 799000;
+        if (move == killer2) return 799000;
 
         // history heuristics
         
@@ -337,12 +329,27 @@ namespace Search
 
         if (alpha >= beta) return alpha;
 
-        // null move pruning
-
         bool inCheck = is_in_check(board);
+        int staticEval = Eval::evaluate(board);
+
+        // reverse futility pruning
+        if (
+            depth > 0 &&
+            depth <= 6 &&
+            !inCheck &&
+            board.ply > 0 &&
+            beta < Eval::MATE_SCORE - 1000
+        )
+        {
+            int margin = 100 * depth;
+            if (staticEval >= beta + margin) return beta;
+        }
+
+        // null move pruning
         if (
             depth >= 4 &&
             !inCheck &&
+            staticEval >= beta &&
             board.ply > 0 &&
             has_non_pawn_material(board, board.stm)
         )

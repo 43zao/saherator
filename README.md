@@ -22,6 +22,7 @@ Challenge it at: https://lichess.org/@/saherator
 - Principal variation search
 - Late move reductions
 - Check extensions
+- Reverse futility pruning
 - Null move pruning
 - Quiescence search
 - Transposition tables
