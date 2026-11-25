@@ -1,4 +1,5 @@
 #include "search.h"
+#include "opening_book.h"
 #include <chrono>
 #include <atomic>
 #include <iostream>
@@ -603,6 +604,18 @@ namespace Search
 
         std::memset(killerMoves, 0, sizeof(killerMoves));
         std::memset(historyTable, 0, sizeof(historyTable));
+
+        Move bookMove = 0;
+        if (OpeningBook::probe(board, bookMove))
+        {
+            best.bestMove = bookMove;
+            best.score = Eval::evaluate(board);
+            std::cout
+                << "info depth 0"
+                << " score cp " << best.score
+                << "\n";
+            return best;
+        }
 
         // iterative deepening
         for (int depth = 1; depth <= maxDepth; depth++)

@@ -4,19 +4,28 @@
 #include "timeman.h"
 #include "attacks.h"
 #include "eval.h"
+#include "opening_book.h"
 
 #include <sstream>
 #include <iostream>
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <cctype>
 
 namespace UCI
 {
     constexpr int MAX_DEPTH = 64;
+#ifdef SAHERATOR_EMBED_OPENING_BOOK
+    static const std::string DEFAULT_BOOK_FILE = "<embedded>";
+#else
+    static const std::string DEFAULT_BOOK_FILE = "opening-book/komodo.bin";
+#endif
 
     static std::thread searchThread;
     static std::mutex coutMutex;
+    static std::string bookFile = DEFAULT_BOOK_FILE;
+    static bool ownBook = true;
 
     // UCI output (thread-safe)
     static void uci_print(const std::string &s)
@@ -100,8 +109,7 @@ namespace UCI
     // searches for the best move
     static void search_worker(Board board, int depth)
     {
-        Search::SearchResult result =
-            Search::find_best_move(board, depth);
+        Search::SearchResult result = Search::find_best_move(board, depth);
 
         std::string output;
 
@@ -126,9 +134,93 @@ namespace UCI
     static void stop_search_thread()
     {
         Search::stop();
+        if (searchThread.joinable()) searchThread.join();
+    }
 
-        if (searchThread.joinable())
-            searchThread.join();
+    static std::string trim(std::string value)
+    {
+        const std::size_t first = value.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) return {};
+
+        const std::size_t last = value.find_last_not_of(" \t\r\n");
+        return value.substr(first, last - first + 1);
+    }
+
+    static std::string lowercase(std::string value)
+    {
+        for (char &ch : value) {
+            ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        return value;
+    }
+
+    static void handle_setoption(std::istringstream &iss)
+    {
+        std::string token;
+        if (!(iss >> token) || lowercase(token) != "name") return;
+
+        std::string optionName;
+        std::string value;
+        bool hasValue = false;
+
+        while (iss >> token)
+        {
+            if (lowercase(token) == "value")
+            {
+                std::getline(iss, value);
+                value = trim(value);
+                hasValue = true;
+                break;
+            }
+
+            if (!optionName.empty()) optionName += ' ';
+            optionName += token;
+        }
+
+        const std::string optionId = lowercase(trim(optionName));
+
+        if (optionId == "ownbook")
+        {
+            const std::string setting = lowercase(value);
+            if (!hasValue || (setting != "true" && setting != "false"))
+            {
+                uci_print("info string OwnBook expects true or false");
+                return;
+            }
+
+            stop_search_thread();
+            ownBook = setting == "true";
+            OpeningBook::set_enabled(ownBook);
+            return;
+        }
+
+        if (optionId == "bookfile")
+        {
+            if (!hasValue)
+            {
+                uci_print("info string BookFile expects a path or <empty>");
+                return;
+            }
+
+            if (value == "<empty>") value.clear();
+            else if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+            {
+                value = value.substr(1, value.size() - 2);
+            }
+
+            stop_search_thread();
+            bookFile = value;
+            if (OpeningBook::initialize(bookFile))
+            {
+                uci_print("info string loaded opening book: " + bookFile);
+            }
+            else
+            {
+                uci_print(bookFile.empty()
+                    ? "info string BookFile is empty; opening book is unavailable"
+                    : "info string could not load opening book: " + bookFile);
+            }
+        }
     }
 
     //--------------------------------------------------
@@ -249,6 +341,8 @@ namespace UCI
         init_movegen();
         init_between_tables();
         Eval::init_eval();
+        OpeningBook::initialize(bookFile);
+        OpeningBook::set_enabled(ownBook);
 
         Board board;
         board.init_from_fen(STARTFEN);
@@ -271,7 +365,18 @@ namespace UCI
                 uci_print("id name saherator");
                 uci_print("id author 43zao");
                 uci_print("option name Ponder type check default true");
+                uci_print("option name OwnBook type check default true");
+                uci_print("option name BookFile type string default " + DEFAULT_BOOK_FILE);
                 uci_print("uciok");
+            }
+
+            //--------------------------------------------------
+            // OPTIONS
+            //--------------------------------------------------
+
+            else if (command == "setoption")
+            {
+                handle_setoption(iss);
             }
 
             //--------------------------------------------------

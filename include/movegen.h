@@ -1,6 +1,5 @@
 #pragma once
 #include "board.h"
-#include <array>
 
 // Contains necessary data structures and does move generation for each piece.
 // Enables fast lookup using bitboards and magic bitboards for sliders.

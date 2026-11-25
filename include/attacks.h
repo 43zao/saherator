@@ -1,6 +1,5 @@
 #pragma once
 #include "movegen.h"
-#include <cstring>
 
 // An extension to the standard naive movegen.
 // Keeps track of generational state to more efficiently filter for legality.

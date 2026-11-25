@@ -1,4 +1,5 @@
 #include "attacks.h"
+#include <cstring>
 
 U64 betweenBB[64][64];
 U64 lineBB[64][64];

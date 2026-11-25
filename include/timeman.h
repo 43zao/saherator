@@ -17,7 +17,7 @@ namespace TimeMan
         int movetime = -1;
     };
 
-    // opening: no book so solid time
+    // opening
     constexpr double OPENING_DIVISOR = 30.0;
 
     // middlegame: spend most time
@@ -39,7 +39,7 @@ namespace TimeMan
     constexpr int LOW_TIME_RESERVE = 1000;      // 1 secs
 
     // never think less than this
-    constexpr int MIN_THINK_TIME = 50;
+    constexpr int MIN_THINK_TIME = 25;
 
     int allocate_time(const Board &board, const TimeControl &tc);
 }

@@ -1,6 +1,6 @@
 #include "movegen.h"
+#include <array>
 #include <cstring>
-#include <cassert>
 
 // attack tables
 U64 pawnMoves[2][64];
@@ -17,7 +17,7 @@ U64 rookMasks[64];
 int bishopShifts[64];
 int rookShifts[64];
 
-// Precomputed magic numbers for bishop and rook attacks
+// precomputed magic numbers for bishop and rook attacks
 
 U64 bishopMagics[64] = {
     0xFFEDF9FD7CFCFFFFULL, 0xFC0962854A77F576ULL, 0x5822022042000000ULL, 0x2CA804A100200020ULL,

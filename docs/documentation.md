@@ -303,6 +303,7 @@ The šaherator engine supports the Universal Chess Interface protocol, which all
 Currently implemented commands:
 
 * `uci`
+* `setoption`
 * `isready`
 * `ucinewgame`
 * `position (startpos / fen ...) (moves ...)`
@@ -310,6 +311,23 @@ Currently implemented commands:
 * `ponderhit`
 * `stop`
 * `quit`
+
+The engine also exposes two opening-book options:
+
+* `OwnBook` (`check`, default `true`) enables or disables opening-book moves.
+* `BookFile` (`string`) selects a Polyglot `.bin` file. The default is `<embedded>` in the default build and `opening-book/komodo.bin` when embedding is disabled.
+
+Examples sent by a UCI GUI:
+
+```text
+setoption name OwnBook value false
+setoption name OwnBook value true
+setoption name BookFile value /path/to/my-book.bin
+```
+
+Use `setoption name BookFile value <empty>` to unload the current book. In an embedded build, `setoption name BookFile value <embedded>` selects the compiled-in book again. A relative file path is tried from the current working directory, its parent directory, and the project source directory. If the book cannot be loaded, the engine continues with normal search and reports a load error when `BookFile` is changed through UCI.
+
+The book is loaded at engine startup. `OwnBook` only controls whether the loaded book is probed; it does not discard the loaded entries. Changing `BookFile` reloads the selected book.
 
 There is also a small debug command:
 
@@ -359,6 +377,68 @@ and returns:
 `bestmove <move>`
 
 This connects the move generator, evaluation function, and search system, allowing the engine to play actual games.
+
+---
+
+## Opening Book Support
+
+The `opening_book.h` / `opening_book.cpp` module reads Polyglot opening books (`.bin` files) and handles book loading, Polyglot position hashing, move conversion, and weighted move selection independently of the engine's normal Zobrist hash and packed move format.
+
+### Polyglot file format
+
+Each record is 16 bytes, with multi-byte fields stored in big-endian order:
+
+| Field | Size |
+| --- | ---: |
+| Position key | 8 bytes |
+| Encoded move | 2 bytes |
+| Move weight | 2 bytes |
+| Learn value | 4 bytes |
+
+The file must contain complete records and be sorted by position key. Invalid, unsorted, or empty files are rejected. The `learn` value is read as part of each record; move choice is weighted by the record's `weight` field.
+
+### Position and move handling
+
+Polyglot uses its own Zobrist key layout, so the module computes a Polyglot key from the board instead of using the engine's transposition-table key. It decodes Polyglot's compact move into the engine's packed `Move` representation and checks it against the legal moves for the position. This includes handling Polyglot castling moves, which encode the king moving to the rook's square, and promotions. The reverse encoder is also available for converting engine moves to Polyglot move values.
+
+For a matching position, the module ignores zero-weight or illegal book moves and makes a random weighted choice among the remaining legal moves. If there is no matching position or no usable move, search proceeds normally.
+
+### Search behavior
+
+At the beginning of `Search::find_best_move()`, the engine probes the book before iterative deepening. If a legal book move is found, it returns that move immediately. If book use is disabled or the position has no usable entry, the normal search runs.
+
+### Runtime book selection through UCI
+
+The UCI options are:
+
+| Option | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `OwnBook` | check | `true` | Enable or disable book probing while retaining loaded book data. |
+| `BookFile` | string | `<embedded>` or `opening-book/komodo.bin` | Load a Polyglot book from the given path, unload it with `<empty>`, or select the embedded book with `<embedded>` in an embedded build. |
+
+Example:
+
+```text
+setoption name BookFile value /home/user/chess/my-book.bin
+setoption name OwnBook value false
+```
+
+Paths containing spaces may be surrounded with double quotes. To load another book, set `BookFile` to its path. The engine stops an active search before applying either option.
+
+### Build-time embedding
+
+Embedding is enabled by default. Configure a separate build directory to select a different book:
+
+```sh
+cmake -S . -B build-embedded \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DSAHERATOR_EMBED_OPENING_BOOK=ON \
+  -DSAHERATOR_OPENING_BOOK_FILE=/path/to/another-book.bin
+cmake --build build-embedded --config Release
+```
+
+`SAHERATOR_OPENING_BOOK_FILE` defaults to `${PROJECT_SOURCE_DIR}/opening-book/komodo.bin`. When embedding is enabled, CMake checks that the file exists and contains complete 16-byte records, then generates a header in the build directory containing the book bytes. The executable loads that data when `BookFile` is `<embedded>`, so the `.bin` file is only needed at build time. `BookFile` can still be changed through UCI to use an external book instead. Configure again after changing the input book so the generated embedded data is refreshed.
+
 
 ---
 
@@ -765,7 +845,6 @@ Two killer moves are stored per ply:
 * singular extensions
 * razoring
 * improved SEE-based pruning
-* opening books
 * endgame tablebase support
 * SMP parallel search
 * neural evaluation integration
