@@ -4,7 +4,7 @@ A bitboard-based chess engine written from scratch in C++.
 
 Built with passion as a learning project that connects my career with my favorite passtime. :]
 
-2000+ Lichess elo.
+2100+ Lichess BOT elo.
 
 Challenge it at: https://lichess.org/@/saherator
 
@@ -37,7 +37,7 @@ Challenge it at: https://lichess.org/@/saherator
 - Time management
 - Pondering
 - Weighted Polyglot opening book
-- Syzygy endgame tablebase probing (up to 5 pieces)
+- Syzygy endgame tablebase probing
 
 ## Building
 
