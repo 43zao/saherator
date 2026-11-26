@@ -13,6 +13,10 @@ file(GLOB SOURCES
 
 add_executable(Saherator ${SOURCES})
 
+# Fathom provides Syzygy tablebase probing. The tablebase data stays external.
+target_sources(Saherator PRIVATE third_party/fathom/tbprobe.c)
+target_include_directories(Saherator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/fathom")
+
 # Optionally include a Polyglot book in the executable so it is not needed at
 # runtime. The UCI BookFile option can still select a separate external book.
 option(SAHERATOR_EMBED_OPENING_BOOK "Embed a Polyglot opening book in the executable" ON)

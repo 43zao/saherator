@@ -5,6 +5,7 @@
 #include "attacks.h"
 #include "eval.h"
 #include "opening_book.h"
+#include "tablebase.h"
 
 #include <sstream>
 #include <iostream>
@@ -12,6 +13,7 @@
 #include <atomic>
 #include <mutex>
 #include <cctype>
+#include <filesystem>
 
 namespace UCI
 {
@@ -21,11 +23,23 @@ namespace UCI
 #else
     static const std::string DEFAULT_BOOK_FILE = "opening-book/komodo.bin";
 #endif
+    static const std::string DEFAULT_SYZYGY_PATH = []
+    {
+        // resolve the default from the project source location
+        const std::filesystem::path sourcePath(__FILE__);
+        if (sourcePath.is_absolute())
+        {
+            return (sourcePath.parent_path().parent_path() /
+                    "tablebases/syzygy-3-5").lexically_normal().string();
+        }
+        return std::string("tablebases/syzygy-3-5");
+    }();
 
     static std::thread searchThread;
     static std::mutex coutMutex;
     static std::string bookFile = DEFAULT_BOOK_FILE;
     static bool ownBook = true;
+    static std::string syzygyPath = DEFAULT_SYZYGY_PATH;
 
     // UCI output (thread-safe)
     static void uci_print(const std::string &s)
@@ -221,6 +235,29 @@ namespace UCI
                     : "info string could not load opening book: " + bookFile);
             }
         }
+
+        if (optionId == "syzygypath")
+        {
+            if (!hasValue)
+            {
+                uci_print("info string SyzygyPath expects a path or <empty>");
+                return;
+            }
+
+            if (value == "<empty>") value.clear();
+            else if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+                value = value.substr(1, value.size() - 2);
+
+            stop_search_thread();
+            syzygyPath = value;
+            if (Tablebase::initialize(syzygyPath))
+                uci_print("info string loaded Syzygy tablebases up to " + std::to_string(Tablebase::largest()) + " pieces");
+            else
+                uci_print(syzygyPath.empty()
+                    ? "info string Syzygy tablebases disabled"
+                    : "info string no Syzygy tablebases found at: " + syzygyPath);
+            return;
+        }
     }
 
     //--------------------------------------------------
@@ -343,6 +380,7 @@ namespace UCI
         Eval::init_eval();
         OpeningBook::initialize(bookFile);
         OpeningBook::set_enabled(ownBook);
+        Tablebase::initialize(syzygyPath);
 
         Board board;
         board.init_from_fen(STARTFEN);
@@ -367,6 +405,7 @@ namespace UCI
                 uci_print("option name Ponder type check default true");
                 uci_print("option name OwnBook type check default true");
                 uci_print("option name BookFile type string default " + DEFAULT_BOOK_FILE);
+                uci_print("option name SyzygyPath type string default " + DEFAULT_SYZYGY_PATH);
                 uci_print("uciok");
             }
 

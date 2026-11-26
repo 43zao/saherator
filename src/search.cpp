@@ -1,5 +1,6 @@
 #include "search.h"
 #include "opening_book.h"
+#include "tablebase.h"
 #include <chrono>
 #include <atomic>
 #include <iostream>
@@ -9,6 +10,15 @@
 
 namespace Search
 {
+    constexpr int TB_WIN_SCORE = Eval::MATE_SCORE - 2000;
+
+    static int tablebase_score(int wdl)
+    {
+        if (wdl > 0) return TB_WIN_SCORE;
+        if (wdl < 0) return -TB_WIN_SCORE;
+        return 0;
+    }
+
     static U64 nodes = 0;
 
     static std::chrono::steady_clock::time_point searchStart;
@@ -194,6 +204,20 @@ namespace Search
 
         if (is_repetition(board) || is_50_move_draw(board)) return 0;
 
+        bool inCheck = false;
+        const bool hasWdlTablebase =
+            board.castling == 0 && board.halfmove == 0 &&
+            bit_count(board.occ[BOTH]) <= static_cast<int>(Tablebase::largest());
+        if (hasWdlTablebase)
+        {
+            inCheck = is_in_check(board);
+            if (!inCheck)
+            {
+                int tablebaseWdl = 0;
+                if (Tablebase::probe_wdl(board, tablebaseWdl)) return tablebase_score(tablebaseWdl);
+            }
+        }
+
         // transposition table probe
         TTEntry &entry = transpositionTable[tt_index(board.zobrist)];
 
@@ -300,6 +324,20 @@ namespace Search
 
         if (is_repetition(board) || is_50_move_draw(board)) return 0;
 
+        bool inCheck = false;
+        const bool hasWdlTablebase =
+            board.castling == 0 && board.halfmove == 0 &&
+            bit_count(board.occ[BOTH]) <= static_cast<int>(Tablebase::largest());
+        if (hasWdlTablebase)
+        {
+            inCheck = is_in_check(board);
+            if (!inCheck)
+            {
+                int tablebaseWdl = 0;
+                if (Tablebase::probe_wdl(board, tablebaseWdl)) return tablebase_score(tablebaseWdl);
+            }
+        }
+
         // transposition table probe
         TTEntry &entry = transpositionTable[tt_index(board.zobrist)];
 
@@ -330,7 +368,8 @@ namespace Search
 
         if (alpha >= beta) return alpha;
 
-        bool inCheck = is_in_check(board);
+        if (!hasWdlTablebase) inCheck = is_in_check(board);
+
         int staticEval = Eval::evaluate(board);
 
         // reverse futility pruning
@@ -604,6 +643,20 @@ namespace Search
 
         std::memset(killerMoves, 0, sizeof(killerMoves));
         std::memset(historyTable, 0, sizeof(historyTable));
+
+        Move tablebaseMove = 0;
+        int tablebaseWdl = 0;
+        const Tablebase::RootStatus tablebaseStatus =
+            Tablebase::probe_root(board, tablebaseMove, tablebaseWdl);
+        if (tablebaseStatus != Tablebase::RootStatus::Unavailable)
+        {
+            best.bestMove = tablebaseMove;
+            best.score = tablebaseStatus == Tablebase::RootStatus::Checkmate
+                ? -Eval::MATE_SCORE + board.ply
+                : tablebase_score(tablebaseWdl);
+            std::cout << "info depth 0 score cp " << best.score << "\n";
+            return best;
+        }
 
         Move bookMove = 0;
         if (OpeningBook::probe(board, bookMove))

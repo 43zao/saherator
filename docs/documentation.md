@@ -316,6 +316,7 @@ The engine also exposes two opening-book options:
 
 * `OwnBook` (`check`, default `true`) enables or disables opening-book moves.
 * `BookFile` (`string`) selects a Polyglot `.bin` file. The default is `<embedded>` in the default build and `opening-book/komodo.bin` when embedding is disabled.
+* `SyzygyPath` (`string`) selects one or more directories containing Syzygy `.rtbw` and `.rtbz` files. Its default resolves to `<project-root>/tablebases/syzygy-3-5`, independent of the engine's working directory.
 
 Examples sent by a UCI GUI:
 
@@ -323,11 +324,14 @@ Examples sent by a UCI GUI:
 setoption name OwnBook value false
 setoption name OwnBook value true
 setoption name BookFile value /path/to/my-book.bin
+setoption name SyzygyPath value /path/to/syzygy
 ```
 
 Use `setoption name BookFile value <empty>` to unload the current book. In an embedded build, `setoption name BookFile value <embedded>` selects the compiled-in book again. A relative file path is tried from the current working directory, its parent directory, and the project source directory. If the book cannot be loaded, the engine continues with normal search and reports a load error when `BookFile` is changed through UCI.
 
 The book is loaded at engine startup. `OwnBook` only controls whether the loaded book is probed; it does not discard the loaded entries. Changing `BookFile` reloads the selected book.
+
+`SyzygyPath` can be set to `<empty>` to disable tablebases. Fathom loads the tablebase files from the selected path at startup and reports the largest supported piece count. Updating the path stops an active search before replacing the loaded tables.
 
 There is also a small debug command:
 
@@ -438,6 +442,24 @@ cmake --build build-embedded --config Release
 ```
 
 `SAHERATOR_OPENING_BOOK_FILE` defaults to `${PROJECT_SOURCE_DIR}/opening-book/komodo.bin`. When embedding is enabled, CMake checks that the file exists and contains complete 16-byte records, then generates a header in the build directory containing the book bytes. The executable loads that data when `BookFile` is `<embedded>`, so the `.bin` file is only needed at build time. `BookFile` can still be changed through UCI to use an external book instead. Configure again after changing the input book so the generated embedded data is refreshed.
+
+---
+
+## Syzygy Endgame Tablebases
+
+Saherator uses the Fathom probe library to read external Syzygy tablebase files. Tablebase data is not embedded in the executable. The default path resolves to `<project-root>/tablebases/syzygy-3-5`, based on the project source location recorded at build time, so Cute Chess can launch the engine from its build directory or another working directory. If the executable is moved away from the source checkout, set `SyzygyPath` explicitly. The tablebase folder is ignored by Git because the complete 3–5-piece set is approximately 1 GB.
+
+Set the UCI option to the directory containing the `.rtbw` (WDL) and `.rtbz` (DTZ) files:
+
+```text
+setoption name SyzygyPath value tablebases/syzygy-3-5
+```
+
+Use `setoption name SyzygyPath value <empty>` to disable tablebases. A colon-separated path list is supported on Unix-like systems; use semicolons on Windows when combining directories.
+
+At the root, Fathom's root probe returns a tablebase-approved move and WDL result, using DTZ data when available to account for the 50-move rule. Inside search, WDL probes are used when the position has no castling rights, contains no more pieces than the loaded set supports, and the halfmove clock is zero. Positions with castling rights or unavailable table files continue through normal search. Tablebase wins and losses use decisive search scores; cursed wins and blessed losses are treated as draws.
+
+Fathom is included under its MIT license in `third_party/fathom`. The Syzygy files themselves remain a separate user-managed download.
 
 
 ---
@@ -845,7 +867,6 @@ Two killer moves are stored per ply:
 * singular extensions
 * razoring
 * improved SEE-based pruning
-* endgame tablebase support
 * SMP parallel search
 * neural evaluation integration
 

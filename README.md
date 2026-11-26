@@ -37,6 +37,7 @@ Challenge it at: https://lichess.org/@/saherator
 - Time management
 - Pondering
 - Weighted Polyglot opening book
+- Syzygy endgame tablebase probing (up to 5 pieces)
 
 ## Building
 
@@ -47,7 +48,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-By default, CMake embeds `opening-book/komodo.bin` into the executable. The `.bin` file is needed when building, but does not need to accompany the finished executable. You can select a different external file from your UCI GUI with `BookFile`, or disable book moves with `OwnBook`:
+By default, CMake embeds `opening-book/komodo.bin` into the executable. The `.bin` file is needed when building, but does not need to accompany the finished executable. Syzygy tablebase files remain external; the default `SyzygyPath` resolves to `<project-root>/tablebases/syzygy-3-5`, independent of the engine's working directory. Use the UCI `SyzygyPath` option to choose another directory. You can select a different opening book from your UCI GUI with `BookFile`, or disable book moves with `OwnBook`:
 
 ```text
 setoption name BookFile value /path/to/my-book.bin
@@ -85,7 +86,6 @@ For the file format, runtime configuration, and supported UCI options, see [Open
 - Mobility evaluation
 - King safety eval improvements
 - Pawn structure eval improvements
-- Endgame tablebase support
 
 ## Documentation
 
